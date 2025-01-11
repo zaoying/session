@@ -43,8 +43,11 @@ pub fn list_known_hosts(offset: usize) -> Result<Vec<String>, Error> {
     let mut ip_map: HashSet<String, RandomState> = HashSet::new();
     let mut ip_array: Vec<String> = Vec::new();
     for host in known_hosts.lines().into_iter() {
-        let segs: Vec<&str> = host.split(' ').collect();
-        let ip = segs[0];
+        if host.trim().is_empty() {
+            continue;
+        }
+        let cols: Vec<&str> = host.split(' ').collect();
+        let ip = cols[0];
         if !ip_map.contains(ip) {
             ip_map.insert(ip.to_string());
             ip_array.push(ip.to_string());
@@ -71,6 +74,9 @@ pub fn load_stored_session() -> Result<Vec<String>, Error> {
     let mut ip_array: Vec<String> = Vec::new();
 
     for session in sessions.lines().into_iter() {
+        if session.trim().is_empty() {
+            continue;
+        }
         if !ip_map.contains(session) {
             ip_map.insert(session.to_string());
             ip_array.push(session.to_string());
@@ -138,6 +144,9 @@ pub fn read_prompt() -> Result<String, Error> {
 }
 
 pub fn save_session(session: String) {
+    if session.is_empty() {
+        return;
+    }
     let home = locate_home_dir();
     let binding = path::Path::new(home.as_str()).join(".session");
     let path = binding.to_str().unwrap();
@@ -153,11 +162,14 @@ pub fn save_session(session: String) {
 }
 
 pub fn ssh_login(session: String) -> io::Result<usize> {
+    if session.is_empty() {
+        return Ok(0);
+    }
     let mut cmd = session.clone();
     if !session.contains("@") {
         println!("Enter username to login {} :", session);
         let mut username = String::new();
-        io::stdin().read_line(&mut username).expect("Failed to username");
+        io::stdin().read_line(&mut username).expect("Failed to get username");
         let username = username.trim();
         cmd = format!("{}@{}", username, session);
         save_session(cmd.clone());
