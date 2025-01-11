@@ -97,18 +97,19 @@ pub fn read_prompt() -> Result<String, Error> {
     println!("List stored sessions from '~/.session': ");
     let sessions = load_stored_session().expect("failed to load sessions");
     println!("-----------------------------------------");
-    println!("1) Enter number to open stored session;");
-    println!("2) Enter 'username@host' to open new session;");
-    println!("3) Enter nothing to list hosts from '~/.ssh/known_host';");
+    println!("* Enter number to open stored session;");
+    println!("* Enter 'username@host' to open new session;");
+    println!("* Enter nothing to list hosts from '~/.ssh/known_host';");
     
     let mut input = String::new();
     io::stdin().read_line(&mut input).expect("Failed to read line");
 
     let mut known_hosts: Vec<String> = Vec::new();
-    let input = input.trim();
-    if input.is_empty() {
+    if input.trim().is_empty() {
         known_hosts = list_known_hosts(sessions.len()).expect("failed to list know_host");
+        io::stdin().read_line(&mut input).expect("Failed to read line");
     }
+    let input = input.trim();
     
     if NUMBER.is_match(input) {
         let index = input.parse::<usize>().expect("failed to parse number");
@@ -119,15 +120,19 @@ pub fn read_prompt() -> Result<String, Error> {
             }
         }
         if !known_hosts.is_empty() {
-            let offset = sessions.len();
-            if offset < index && index <= known_hosts.len() {
-                return match known_hosts.get(index - offset - 1) {
+            let index = index - sessions.len();
+            if 0 < index && index <= known_hosts.len() {
+                return match known_hosts.get(index - 1) {
                     Some(ip) => Ok(ip.to_string()),
                     None => panic!("failed to read from known hosts")
                 }
             }
         }
         panic!("index outbound: {}", index)
+    }
+    
+    if let Err(_) = sessions.binary_search(&input.to_string()) {
+        save_session(input.to_string());
     }
     return Ok(input.to_string());
 }
