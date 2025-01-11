@@ -1,10 +1,12 @@
-use std::{collections::{hash_map::RandomState, HashSet}, fs::{self, OpenOptions}, io::{self, Error, Write}, ops::AddAssign, path};
+use std::{collections::{hash_map::RandomState, HashSet}, fs::{self, OpenOptions}, io::{self, Write}, ops::AddAssign, path};
 use std::process::Command;
+use anyhow::bail;
+use anyhow::Result;
 use lazy_static::lazy_static;
 use regex::Regex;
 
 lazy_static! {
-    static ref NUMBER: Regex = Regex::new(r"^\d+$").unwrap();
+    static ref NUMBER: Regex = Regex::new(r"^-?\d+$").unwrap();
 }
 
 /// Locates and returns the user's home directory path
@@ -35,7 +37,7 @@ pub fn locate_home_dir() -> String {
 /// - Reads the known_hosts file from ~/.ssh/known_hosts
 /// - Parses and deduplicates host entries
 /// - Prints a numbered list of unique hosts
-pub fn list_known_hosts(offset: usize) -> Result<Vec<String>, Error> {
+pub fn list_known_hosts(offset: usize) -> Result<Vec<String>> {
     let home = locate_home_dir();
     let binding = path::Path::new(home.as_str()).join(".ssh").join("known_hosts");
     let path = binding.to_str().unwrap();
@@ -62,7 +64,7 @@ pub fn list_known_hosts(offset: usize) -> Result<Vec<String>, Error> {
     return Ok(ip_array);
 }
 
-pub fn load_stored_session() -> Result<Vec<String>, Error> {
+pub fn load_stored_session() -> Result<Vec<String>> {
     let home = locate_home_dir();
     let binding = path::Path::new(home.as_str()).join(".session");
     let path = binding.to_str().unwrap();
@@ -99,7 +101,7 @@ pub fn load_stored_session() -> Result<Vec<String>, Error> {
 /// - Reads user input from stdin
 /// - Validates input as a positive integer
 /// - Prints the selected number or an error message for invalid input
-pub fn read_prompt() -> Result<String, Error> {
+pub fn read_prompt() -> Result<String> {
     println!("List stored sessions from '~/.session': ");
     let sessions = load_stored_session().expect("failed to load sessions");
     println!("-----------------------------------------");
@@ -118,11 +120,17 @@ pub fn read_prompt() -> Result<String, Error> {
     let input = input.trim();
     
     if NUMBER.is_match(input) {
-        let index = input.parse::<usize>().expect("failed to parse number");
+        let index = match input.parse::<usize>(){
+            Ok(numb) => numb,
+            Err(e) => bail!("failed to parse number: {}", e)
+        };
+        if index <= 0 {
+            bail!("index outbound: {}", index)
+        }
         if 0 < index && index <= sessions.len() {
             return match sessions.get(index - 1) {
                 Some(ip) => Ok(ip.to_string()),
-                None => panic!("failed to read from known hosts")
+                None => bail!("failed to read from known hosts")
             }
         }
         if !known_hosts.is_empty() {
@@ -130,11 +138,11 @@ pub fn read_prompt() -> Result<String, Error> {
             if 0 < index && index <= known_hosts.len() {
                 return match known_hosts.get(index - 1) {
                     Some(ip) => Ok(ip.to_string()),
-                    None => panic!("failed to read from known hosts")
+                    None => bail!("failed to read from known hosts")
                 }
             }
         }
-        panic!("index outbound: {}", index)
+        bail!("index outbound: {}", index)
     }
     
     if let Err(_) = sessions.binary_search(&input.to_string()) {
