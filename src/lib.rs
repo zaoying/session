@@ -105,7 +105,8 @@ pub fn read_prompt() -> Result<String> {
     println!("List stored sessions from '~/.session': ");
     let sessions = load_stored_session().expect("failed to load sessions");
     println!("-----------------------------------------");
-    println!("* Enter number to open stored session;");
+    println!("* Enter number listed above to open session, such as '1';");
+    println!("* Enter negative number listed above to delete session, such as '-1';");
     println!("* Enter 'username@host' to open new session;");
     println!("* Enter nothing to list hosts from '~/.ssh/known_host';");
     
@@ -120,26 +121,36 @@ pub fn read_prompt() -> Result<String> {
     let input = input.trim();
     
     if NUMBER.is_match(input) {
-        let index = match input.parse::<usize>(){
+        let index = match input.parse::<i32>(){
             Ok(numb) => numb,
             Err(e) => bail!("failed to parse number: {}", e)
         };
-        if index <= 0 {
-            bail!("index outbound: {}", index)
+        if index == 0 {
+            bail!("bye")
         }
+        if index < 0 {
+            let line = (0 - index) as usize;
+            if 0 < line && line <= sessions.len() {
+                return remove_session(sessions, line);
+            }
+            bail!("index outbound: {}", line)
+        }
+        let index = index as usize;
         if 0 < index && index <= sessions.len() {
             return match sessions.get(index - 1) {
                 Some(ip) => Ok(ip.to_string()),
                 None => bail!("failed to read from known hosts")
             }
         }
-        if !known_hosts.is_empty() {
-            let index = index - sessions.len();
-            if 0 < index && index <= known_hosts.len() {
-                return match known_hosts.get(index - 1) {
-                    Some(ip) => Ok(ip.to_string()),
-                    None => bail!("failed to read from known hosts")
-                }
+        if known_hosts.is_empty() {
+            bail!("index outbound: {}", index)
+        }
+
+        let index = index - sessions.len();
+        if 0 < index && index <= known_hosts.len() {
+            return match known_hosts.get(index - 1) {
+                Some(ip) => Ok(ip.to_string()),
+                None => bail!("failed to read from known hosts")
             }
         }
         bail!("index outbound: {}", index)
@@ -166,7 +177,9 @@ pub fn save_session(session: String) {
     .open(path).expect("failed to open .session");
     
     let content = session + "\n";
-    file.write_all(content.as_bytes()).expect("failed to save session");
+    if let Err(e) = file.write_all(content.as_bytes()) {
+        eprintln!("failed to save session: {}", e)
+    }
 }
 
 pub fn ssh_login(session: String) -> io::Result<usize> {
@@ -194,5 +207,34 @@ pub fn ssh_login(session: String) -> io::Result<usize> {
         io::stdout().write(&output.stdout)
     } else {
         io::stderr().write(&output.stderr)
+    }
+}
+
+pub fn remove_session(sessions: Vec<String>, line: usize) -> Result<String> {
+    let home = locate_home_dir();
+    let binding = path::Path::new(home.as_str()).join(".session");
+    let path = binding.to_str().unwrap();
+    let mut file = OpenOptions::new()
+    .truncate(true)
+    .write(true)
+    .create(true)
+    .open(path).expect("failed to truncate session");
+
+    let mut index: usize = 0;
+    let mut deletion = None;
+    for session in sessions {
+        index.add_assign(1);
+        if index == line {
+            deletion = Some(session.clone());
+            continue;
+        }
+        let row = session + "\n";
+        if let Err(e) = file.write(row.as_bytes()) {
+            bail!("failed to save session: {}", e)
+        }
+    };
+    match deletion {
+        Some(session) => bail!("{} deleted!", session),
+        None => bail!("deletion failed!")
     }
 }
