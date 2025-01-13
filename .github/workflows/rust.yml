@@ -25,3 +25,4 @@ jobs:
         name: session
         artifacts: "target/release/session*"
         prerelease: true
+        tag: "v0.0.1"
