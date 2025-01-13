@@ -23,6 +23,6 @@ jobs:
     - uses: ncipollo/release-action@v1
       with:
         name: session
-        artifacts: "target/release/session*"
+        artifacts: "target/release/session.exe"
         prerelease: true
         tag: "v0.0.1"
