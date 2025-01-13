@@ -22,10 +22,9 @@ jobs:
       run: cargo build --release
     - name: Run tests
       run: cargo test --verbose
-    - name: Upload a Build Artifact
-      uses: actions/upload-artifact@v4.6.0
+    - uses: ncipollo/release-action@v1
       with:
-        # Artifact name
         name: session
-        # A file, directory or wildcard pattern that describes what to upload
-        path: target/release/session.exe
+        artifacts: "target/release/session*"
+        prerelease: true
+        tag: "v0.0.1"
