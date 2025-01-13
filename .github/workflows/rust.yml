@@ -22,9 +22,3 @@ jobs:
       run: cargo build --release
     - name: Run tests
       run: cargo test --verbose
-    - uses: ncipollo/release-action@v1
-      with:
-        name: session
-        artifacts: "target/release/session*"
-        prerelease: true
-        tag: "v0.0.1"
